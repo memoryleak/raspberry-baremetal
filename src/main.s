@@ -1,163 +1,119 @@
-@ Helper constants for setting 001 (OUTPUT) in GPSEL registers
-.equ GPSEL_OUPTUT_BANK_0, 0x1
-.equ GPSEL_OUPTUT_BANK_1, 0x8
-.equ GPSEL_OUPTUT_BANK_2, 0x40
-.equ GPSEL_OUPTUT_BANK_3, 0x200
-.equ GPSEL_OUPTUT_BANK_4, 0x1000
-.equ GPSEL_OUPTUT_BANK_5, 0x8000
-.equ GPSEL_OUPTUT_BANK_6, 0x40000
-.equ GPSEL_OUPTUT_BANK_7, 0x200000
-.equ GPSEL_OUPTUT_BANK_8, 0x1000000
-.equ GPSEL_OUPTUT_BANK_9, 0x8000000
+.section ".init"
 
-@ Helper constants for setting the GPIO pin to HIGH
-.equ GPSET0_PIN_0, 0x1
-.equ GPSET0_PIN_1, 0x2
-.equ GPSET0_PIN_2, 0x4
-.equ GPSET0_PIN_3, 0x8
-.equ GPSET0_PIN_4, 0x10
-.equ GPSET0_PIN_5, 0x20
-.equ GPSET0_PIN_6, 0x40
-.equ GPSET0_PIN_7, 0x80
-.equ GPSET0_PIN_8, 0x100
-.equ GPSET0_PIN_9, 0x200
-.equ GPSET0_PIN_10, 0x400
-.equ GPSET0_PIN_11, 0x800
-.equ GPSET0_PIN_12, 0x1000
-.equ GPSET0_PIN_13, 0x2000
-.equ GPSET0_PIN_14, 0x4000
-.equ GPSET0_PIN_15, 0x8000
-.equ GPSET0_PIN_16, 0x10000
-.equ GPSET0_PIN_17, 0x20000
-.equ GPSET0_PIN_18, 0x40000
-.equ GPSET0_PIN_19, 0x80000
-.equ GPSET0_PIN_20, 0x100000
-.equ GPSET0_PIN_21, 0x200000
-.equ GPSET0_PIN_22, 0x400000
-.equ GPSET0_PIN_23, 0x800000
-.equ GPSET0_PIN_24, 0x1000000
-.equ GPSET0_PIN_25, 0x2000000
-.equ GPSET0_PIN_26, 0x4000000
-.equ GPSET0_PIN_27, 0x8000000
-.equ GPSET0_PIN_28, 0x10000000
-.equ GPSET0_PIN_29, 0x20000000
-.equ GPSET0_PIN_30, 0x40000000
-.equ GPSET0_PIN_31, 0x80000000
+.global _start
+.global _get_stack_pointer
+.global _exception_table
+.global _enable_interrupts
 
-.equ GPIO_base, 0x3f200000
+// From the ARM ARM (Architecture Reference Manual). Make sure you get the
+// ARMv5 documentation which includes the ARMv6 documentation which is the
+// correct processor type for the Broadcom BCM2835. The ARMv6-M manuals
+// available on the ARM website are for Cortex-M parts only and are very
+// different.
+//
+// See ARM section A2.2 (Processor Modes)
 
-@ GPIO register offsets
-.equ GPFSEL0, 0x0
-.equ GPFSEL1, 0x4
-.equ GPFSEL2, 0x8
-.equ GPFSEL3, 0xC
-.equ GPFSEL4, 0x10 
-.equ GPFSEL5, 0x14
+.equ    CPSR_MODE_USER,         0x10
+.equ    CPSR_MODE_FIQ,          0x11
+.equ    CPSR_MODE_IRQ,          0x12
+.equ    CPSR_MODE_SVR,          0x13
+.equ    CPSR_MODE_ABORT,        0x17
+.equ    CPSR_MODE_UNDEFINED,    0x1B
+.equ    CPSR_MODE_SYSTEM,       0x1F
 
-.equ GPSET0, 0x1C 
-.equ GPSET1, 0x20
+// See ARM section A2.5 (Program status registers)
+.equ    CPSR_IRQ_INHIBIT,       0x80
+.equ    CPSR_FIQ_INHIBIT,       0x40
+.equ    CPSR_THUMB,             0x20
 
-.equ GPCLR0, 0x28
-.equ GPCLR1, 0x2C
+_start:
+    ldr pc, _reset_h
+    ldr pc, _undefined_instruction_vector_h
+    ldr pc, _software_interrupt_vector_h
+    ldr pc, _prefetch_abort_vector_h
+    ldr pc, _data_abort_vector_h
+    ldr pc, _unused_handler_h
+    ldr pc, _interrupt_vector_h
+    ldr pc, _fast_interrupt_vector_h
 
-.equ TIMER_base, 0x3f003000
-.equ TIMER_CLO, 0x4
+_reset_h:                           .word   _reset_
+_undefined_instruction_vector_h:    .word   undefined_instruction_vector
+_software_interrupt_vector_h:       .word   software_interrupt_vector
+_prefetch_abort_vector_h:           .word   prefetch_abort_vector
+_data_abort_vector_h:               .word   data_abort_vector
+_unused_handler_h:                  .word   _reset_
+_interrupt_vector_h:                .word   interrupt_vector
+_fast_interrupt_vector_h:           .word   fast_interrupt_vector
 
-ldr r0,=GPIO_base
-ldr r6,=TIMER_base
+_reset_:
+    // We enter execution in supervisor mode. For more information on
+    // processor modes see ARM Section A2.2 (Processor Modes)
 
-bl pin_init
-bl blink_leds
+    mov     r0, #0x8000
+    mov     r1, #0x0000
+    ldmia   r0!,{r2, r3, r4, r5, r6, r7, r8, r9}
+    stmia   r1!,{r2, r3, r4, r5, r6, r7, r8, r9}
+    ldmia   r0!,{r2, r3, r4, r5, r6, r7, r8, r9}
+    stmia   r1!,{r2, r3, r4, r5, r6, r7, r8, r9}
 
+    // We're going to use interrupt mode, so setup the interrupt mode
+    // stack pointer which differs to the application stack pointer:
+    mov r0, #(CPSR_MODE_IRQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+    msr cpsr_c, r0
+    mov sp, #(63 * 1024 * 1024)
 
-@ Initialize yellow pin
-pin_init:
-	mov r1, #GPSEL_OUPTUT_BANK_4
-	orr r1, #GPSEL_OUPTUT_BANK_5
-	orr r1, #GPSEL_OUPTUT_BANK_6
-	str r1, [r0, #GPFSEL0]
-	BX lr
+    // Switch back to supervisor mode (our application mode) and
+    // set the stack pointer towards the end of RAM. Remember that the
+    // stack works its way down memory, our heap will work it's way
+    // up memory toward the application stack.
+    mov r0, #(CPSR_MODE_SVR | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+    msr cpsr_c, r0
 
-pin_yellow_off:
-	mov r1, #GPSET0_PIN_4
-	str	r1, [r0, #GPCLR0]
-	BX lr
+    // Set the stack pointer at some point in RAM that won't harm us
+    // It's different from the IRQ stack pointer above and no matter
+    // what the GPU/CPU memory split, 64MB is available to the CPU
+    // Keep it within the limits and also keep it aligned to a 32-bit
+    // boundary!
+    ldr     sp, =0x8000
 
-pin_yellow_on:
-	mov r1, #GPSET0_PIN_4
-	str	r1, [r0, #GPSET0]
-	BX lr
+    // The c-startup function which we never return from. This function will
+    // initialise the ro data section (most things that have the const
+    // declaration) and initialise the bss section variables to 0 (generally
+    // known as automatics). It'll then call main, which should never return.
+    bl      _inf_loop
+
+    // If main does return for some reason, just catch it and stay here.
+_inf_loop:
+    b       _inf_loop
 
 
-pin_green_off:
-	mov r1, #GPSET0_PIN_5
-	str	r1, [r0, #GPCLR0]
-	BX lr
+_get_stack_pointer:
+    // Return the stack pointer value
+    str     sp, [sp]
+    ldr     r0, [sp]
 
-pin_green_on:
-	mov r1, #GPSET0_PIN_5
-	str	r1, [r0, #GPSET0]
-	BX lr
+    // Return from the function
+    mov     pc, lr
 
 
-pin_red_off:
-	mov r1, #GPSET0_PIN_6
-	str	r1, [r0, #GPCLR0]
-	BX lr
+_enable_interrupts:
+    mrs     r0, cpsr
+    bic     r0, r0, #0x80
+    msr     cpsr_c, r0
 
-pin_red_on:
-	mov r1, #GPSET0_PIN_6
-	str	r1, [r0, #GPSET0]
-	BX lr
+    mov     pc, lr
 
+undefined_instruction_vector:
+	b .
+software_interrupt_vector:
+	b .
+prefetch_abort_vector:
+	b .
 
-blink_leds:
-	blink_leds_loop:
-		bl pin_yellow_on
-		bl short_break
-		bl pin_yellow_off
-		bl short_break
+data_abort_vector:
+	b .
 
-		bl pin_green_on
-		bl short_break
-		bl pin_green_off
-		bl short_break
-		
-		bl pin_red_on
-		bl short_break
-		bl pin_red_off
-		bl long_break
-
-		bl blink_leds_loop
-	bx lr
-
-
-@ Timer based pause
-short_break:
-	mov r8, #500
-	mov r9, #1000
-	mul r7, r8, r9 @ 500 * 1000 * r7 ~= 500ms
-	ldr r10, [r6, #TIMER_CLO] @ START time
-
-	short_break_wait:
-		ldr r11, [r6, #TIMER_CLO] @ current time
-		sub r11, r11, r10 @ current time - start time = elapsed time
-		cmp r11, r7 @ current elapsed time == wait period?
-		blt short_break_wait
-
-	bx lr
-
-long_break:
-	mov r8, #1000
-	mov r9, #1000
-	mul r7, r8, r9 @ 500 * 1000 * r7 ~= 500ms
-	ldr r10, [r6, #TIMER_CLO] @ START time
-
-	long_break_wait:
-		ldr r11, [r6, #TIMER_CLO] @ current time
-		sub r11, r11, r10 @ current time - start time = elapsed time
-		cmp r11, r7 @ current elapsed time == wait period?
-		blt short_break_wait
-
-	bx lr
-
+interrupt_vector:
+	b .
+fast_interrupt_vector:
+	b .
