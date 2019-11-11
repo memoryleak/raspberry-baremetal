@@ -109,7 +109,12 @@ loop:
         bl      gpioPinSet
         mov     r0, ONE_SEC     @ wait a second
         bl      sleep
-        subs    r6, r6, 1       @ decrement counter
+
+	mov     r0, r5          @ GPIO programming memory
+        mov     r1, PIN17
+        bl      gpioPinClr
+
+	subs    r6, r6, 1       @ decrement counter
         bgt     loop            @ loop until 0
         
         mov     r0, r5          @ memory to unmap
