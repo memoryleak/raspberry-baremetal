@@ -22,17 +22,16 @@ In order to boot the new build image copy the contents of dist/ onto a SD-Card, 
 ### dnsmasq configuration for network boot
 Raspbery devices is plugged directly into the server (my desktop running Fedora 30):
 
-	user=dnsmasq
-	group=dnsmasq
+	port=0
 	interface=enp4s0
 	dhcp-range=192.168.200.50,192.168.200.150,12h
 	dhcp-host=0c:9d:92:85:e4:ab,192.168.200.1
 	dhcp-boot=pxelinux,192.168.200.1
 	enable-tftp
-	tftp-root=[PATH-TO-REPO]/dist
+	tftp-root=[PATH-TO]/raspberry-baremetal/dist
+	log-facility=/var/log/dnsmasq.log   # logfile path.
 	log-queries
 	log-dhcp
-	conf-dir=/etc/dnsmasq.d,.rpmnew,.rpmsave,.rpmorig
+
 
 	sudo dnsmasq --no-daemon --log-queries --log-facility=/var/log/dnsmasq.log
-
